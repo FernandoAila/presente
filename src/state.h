@@ -12,12 +12,12 @@
 #define MINION_RAD 12
 #define BRUTE_HP   12
 #define BRUTE_RAD  16
+#define MAX_CELLS 5000
+#define BOSS_SPEED 3
 
 #define BULLET_DMG 3
 #define BULLET_SPEED 16
 #define BULLET_RAD   5
-
-
 // ==== PLAYER DEFINITION
 typedef struct {
     entity ent;
@@ -26,12 +26,25 @@ typedef struct {
 } player;
 
 // ==== ENEMY DEFINITION
-typedef enum {MINION=0, BRUTE=1} enemykind;
-
+typedef enum {MINION=0, BRUTE=1, BOSS=2} enemykind;
+typedef struct {
+    int start;
+    int end;
+    int rows;
+    int cols;
+    int calls;
+    int f_score[MAX_CELLS];
+    int g_score[MAX_CELLS];
+    int parent[MAX_CELLS];
+    int state[MAX_CELLS];
+    int is_wall[MAX_CELLS];
+}pathfinder;
 typedef struct {
     entity ent;
     enemykind kind;
 } enemy;
+
+
 
 // ==== BULLET DEFINTION
 
@@ -51,6 +64,7 @@ typedef struct {
 typedef struct {
     // The player
     player pla;
+    pathfinder pt;
 
     // An array of enemies:
     int n_enemies;
@@ -67,8 +81,7 @@ typedef struct {
 } state;
 
 // Creates an empty state, allocating memory for it.
-state *state_new();
-
+state *state_new(level lvl);
 // Updates the state of the game to the next frame.
 void state_update(level *lvl, state *sta);
 
@@ -77,7 +90,5 @@ void state_populate_random(level *lvl, state *sta, int n_enemies);
 
 // Deletes a state and the memory it requires.
 void state_free(state *sta);
-
-
 
 #endif

@@ -1,12 +1,12 @@
 #include "state.h"
-
+#include "pathfinding.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include <math.h>
 
-state *state_new(){
+state *state_new(level lvl){
     // Ask for memory for the state
     state *sta = malloc(sizeof(state));
 
@@ -19,7 +19,8 @@ state *state_new(){
     sta->pla.ent.y = TILE_SIZE/2;
     sta->pla.ent.rad = PLAYER_RAD;
     sta->pla.ent.hp  = PLAYER_HP;
-
+    // initialize pathfinding
+    path_init(&sta->pt,lvl);
     // Retrieve pointer to the state
     return sta;
 }
@@ -83,13 +84,62 @@ void state_update(level *lvl, state *sta){
             }
         }
     }
-
     // == Update entities
     // Update player
     entity_physics(lvl,&sta->pla.ent);
     if(sta->pla.ent.hp<=0) sta->pla.ent.dead=1;
     // Update enemies
-    for(int i=0;i<sta->n_enemies;i++){
+    for(int i=0;i<sta->n_enemies;i++){ 
+        //Update Boss AI
+        if (sta->enemies[i].kind==BOSS)
+        {  
+            int tile_x=floor(sta->enemies[i].ent.x/TILE_SIZE);
+            int tile_y=floor(sta->enemies[i].ent.y/TILE_SIZE);
+            int tile_start=tile_x*lvl->size_y+tile_y;
+            int tile_end=floor(sta->pla.ent.x/TILE_SIZE)*lvl->size_y+floor(sta->pla.ent.y/TILE_SIZE);
+            hub(sta,tile_start,tile_end,tile_x,tile_y);
+            //top
+            if ((sta->pt.state[tile_x*lvl->size_y+tile_y+1] & 8) == 8)
+            {
+                sta->enemies[i].ent.vy=BOSS_SPEED;
+                sta->enemies[i].ent.vx=0;
+                sta->pt.state[tile_x*lvl->size_y+tile_y]=1;
+            }
+            //bottom
+            else if ((sta->pt.state[tile_x*lvl->size_y+tile_y-1] & 8) == 8)
+            {
+                sta->enemies[i].ent.vy=-BOSS_SPEED;
+                sta->enemies[i].ent.vx=0;
+                sta->pt.state[tile_x*lvl->size_y+tile_y]=1;
+            }
+            //RIGHT
+            else if ((sta->pt.state[(tile_x+1)*lvl->size_y+tile_y] & 8) == 8)
+            {
+                sta->enemies[i].ent.vx=BOSS_SPEED;
+                sta->enemies[i].ent.vy=0;
+                sta->pt.state[tile_x*lvl->size_y+tile_y]=1;
+            }
+            // LEFT 
+            else if ((sta->pt.state[(tile_x-1)*lvl->size_y+tile_y] & 8) == 8)
+            {
+                sta->enemies[i].ent.vx=-BOSS_SPEED;
+                sta->enemies[i].ent.vy=0;
+                sta->pt.state[tile_x*lvl->size_y+tile_y]=1;
+            }
+            else
+            {
+                sta->enemies[i].ent.vy=0;
+                sta->enemies[i].ent.vx=0;
+            }
+            
+            //Reset pathfinding algorithm 
+            if (sta->pt.calls==1)
+            {
+             reset(&sta->pt);   
+            }
+            
+        
+        }
         entity_physics(lvl,&sta->enemies[i].ent);
         // Kill enemy if it has less than 0 HP
         if(sta->enemies[i].ent.hp<=0) sta->enemies[i].ent.dead = 1;
@@ -133,6 +183,7 @@ void state_update(level *lvl, state *sta){
 
 void state_populate_random(level *lvl, state *sta, int n_enemies){
     assert(n_enemies<=MAX_ENEMIES);
+    int boss =1;
     while(sta->n_enemies<n_enemies){
         // Until an empty cell is found, Las Vegas algorithm approach.
         while(1){
@@ -153,11 +204,19 @@ void state_populate_random(level *lvl, state *sta, int n_enemies){
                 new_enemy->ent.y = (posy+0.5)*TILE_SIZE;
                 // Pick an enemy tipe and set variables accordingly
                 int brute = rand()%4==0; // brute has 1/4 chance.
-                if(brute){
+                //create only one boss enemy type
+                if(boss){
+                    new_enemy->kind   = BOSS;
+                    new_enemy->ent.hp = BRUTE_HP;
+                    new_enemy->ent.rad = BRUTE_RAD;
+                    boss-=1;
+                }
+                else if(brute){
                     new_enemy->kind   = BRUTE;
                     new_enemy->ent.hp = BRUTE_HP;
                     new_enemy->ent.rad = BRUTE_RAD;
-                }else{
+                }
+                else{
                     new_enemy->kind   = MINION;
                     new_enemy->ent.hp = MINION_HP;
                     new_enemy->ent.rad = MINION_RAD;
