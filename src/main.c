@@ -20,9 +20,9 @@ int main(int argc, char const *argv[]){
     level_fill_random(lvl,6);
 
     // Initialize state (and add enemies)
-    state *sta = state_new();
+    state *sta = state_new(*lvl);
     state_populate_random(lvl,sta,40);
-
+    
     // Main loop
     while(!WindowShouldClose()){
 
